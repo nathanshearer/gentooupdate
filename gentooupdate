@@ -34,7 +34,7 @@ function gentooupdate_abort_if_news
 	if [ $NEWS -ne 0 ]; then
 		printf "This update was aborted because there is unread news:\n\n" >>"$TMP"/news.email
 		eselect news list >>"$TMP"/news.email
-		gentooupdate_email "$EMAIL" "$HOSTNAME: update aborted on $NOW" "$TMP"/news.email
+		gentooupdate_email "$EMAIL_ERROR" "$HOSTNAME: update aborted on $NOW" "$TMP"/news.email
 		gentooupdate_exit 1 "Update aborted because there is unread news"
 	fi
 }
@@ -58,7 +58,9 @@ function gentooupdate_check_dependencies
 function gentooupdate_email
 {
 	echo "gentooupdate_email" "$@" >> "$LOG"
-	cat "$3" | mail -s "$2" "$1"
+	if [ "$1" != "" ]; then
+		cat "$3" | mail -s "$2" "$1"
+	fi
 }
 
 # \brief Cleans up the environment and exits
@@ -133,7 +135,7 @@ function gentooupdate_main
 	if [ $? -ne 0 ]; then
 		printf "The \"emerge --sync\" operation failed. Log is included below:\n\n" >>"$TMP"/emerge.email
 		cat "$TMP"/emerge.log >>"$TMP"/emerge.email
-		cat "$TMP"/emerge.email | mail -s "$HOSTNAME: update failed on $NOW" $EMAIL
+		cat "$TMP"/emerge.email | mail -s "$HOSTNAME: update failed on $NOW" $EMAIL_ERROR
 		gentooupdate_exit 2 "The \"emerge --sync\" operation failed"
 	fi
 
@@ -144,7 +146,7 @@ function gentooupdate_main
 	if [ $? -ne 0 ]; then
 		printf "The \"emerge -uDN --with-bdeps=y world\" operation failed. Log is included below:\n\n" >>"$TMP"/emerge.email
 		cat "$TMP"/emerge.log >>"$TMP"/emerge.email
-		cat "$TMP"/emerge.email | mail -s "$HOSTNAME: update failed on $NOW" $EMAIL
+		cat "$TMP"/emerge.email | mail -s "$HOSTNAME: update failed on $NOW" $EMAIL_ERROR
 		gentooupdate_exit 3 "The \"emerge -uDN --with-bdeps=y world\" operation failed"
 	fi
 
@@ -153,7 +155,7 @@ function gentooupdate_main
 	if [ $? -ne 0 ]; then
 		printf "The \"emerge --depclean\" operation failed. Log is included below:\n\n" >>"$TMP"/emerge.email
 		cat "$TMP"/emerge.log >>"$TMP"/emerge.email
-		cat "$TMP"/emerge.email | mail -s "$HOSTNAME: update failed on $NOW" $EMAIL
+		cat "$TMP"/emerge.email | mail -s "$HOSTNAME: update failed on $NOW" $EMAIL_ERROR
 		gentooupdate_exit 4 "The \"emerge --depclean\" operation failed"
 	fi
 
@@ -162,9 +164,11 @@ function gentooupdate_main
 	if [ $? -ne 0 ]; then
 		printf "The \"revdep-rebuild\" operation failed. Log is included below:\n\n" >>"$TMP"/revdep-rebuild.email
 		cat "$TMP"/revdep-rebuild.log >>"$TMP"/revdep-rebuild.email
-		cat "$TMP"/revdep-rebuild.email | mail -s "$HOSTNAME: update failed on $NOW" $EMAIL
+		cat "$TMP"/revdep-rebuild.email | mail -s "$HOSTNAME: update failed on $NOW" $EMAIL_ERROR
 		gentooupdate_exit 5 "The \"revdep-rebuild\" operation failed"
 	fi
+	
+	printf "The update completed successfully.\n" | mail -s "$HOSTNAME: update completed successfully on $NOW" $EMAIL_LOG
 }
 
 # \brief Prints out the version and copyright and exits this program
@@ -177,7 +181,8 @@ function gentooupdate_version
 #------------------------------------------------------------------------------
 # default configuration
 #
-EMAIL="mail@example.com"
+EMAIL_ERROR=""
+EMAIL_LOG=""
 DEBUG=false
 NICE=0
 TMP="/tmp"
