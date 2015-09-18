@@ -59,7 +59,7 @@ function gentooupdate_depclean
 	local FAIL=0
 	
 	rm -f "$TMP"/depclean.log
-	emerge --depclean >>"$TMP"/depclean.log 2>>"$TMP"/depclean.log
+	emerge $DEPCLEAN_ARGS >>"$TMP"/depclean.log 2>>"$TMP"/depclean.log
 	if [ $? -ne 0 ]; then
 		printf "The \"emerge --depclean\" operation failed. Log is included below:\n\n" >>"$TMP"/depclean.email
 		cat "$TMP"/depclean.log >>"$TMP"/depclean.email
@@ -165,7 +165,7 @@ function gentooupdate_represerve
 	gentooupdate_abort_if_news
 
 	rm -f "$TMP"represerve
-	emerge @preserved-rebuild >>"$TMP"/represerve.log 2>>"$TMP"/represerve.log
+	emerge $REPRESERVE_ARGS >>"$TMP"/represerve.log 2>>"$TMP"/represerve.log
 	if [ $? -ne 0 ]; then
 		printf "The \"emerge @preserved-rebuild\" operation failed. Log is included below:\n\n" >>"$TMP"/represerve.email
 		cat "$TMP"/represerve.log >>"$TMP"/represerve.email
@@ -182,7 +182,7 @@ function gentooupdate_revdep
 	local FAIL=0
 	
 	rm -f "$TMP"/revdep-rebuild.log
-	revdep-rebuild >>"$TMP"/revdep-rebuild.log 2>>"$TMP"/revdep-rebuild.log
+	revdep-rebuild $REVDEP_ARGS >>"$TMP"/revdep-rebuild.log 2>>"$TMP"/revdep-rebuild.log
 	if [ $? -ne 0 ]; then
 		printf "The \"revdep-rebuild\" operation failed. Log is included below:\n\n" >>"$TMP"/revdep-rebuild.email
 		cat "$TMP"/revdep-rebuild.log >>"$TMP"/revdep-rebuild.email
@@ -201,7 +201,7 @@ function gentooupdate_sync
 	gentooupdate_abort_if_news
 
 	rm -f "$TMP"/sync.log
-	emerge --sync >>"$TMP"/sync.log 2>>"$TMP"/sync.log
+	emerge $SYNC_ARGS >>"$TMP"/sync.log 2>>"$TMP"/sync.log
 	if [ $? -ne 0 ]; then
 		printf "The \"emerge --sync\" operation failed. Log is included below:\n\n" >>"$TMP"/sync.email
 		cat "$TMP"/sync.log >>"$TMP"/sync.email
@@ -220,7 +220,7 @@ function gentooupdate_update
 	gentooupdate_abort_if_news
 
 	rm -f "$TMP"/update.log
-	emerge -uDN --with-bdeps=y world >>"$TMP"/update.log 2>>"$TMP"/update.log
+	emerge $UPDATE_ARGS >>"$TMP"/update.log 2>>"$TMP"/update.log
 	if [ $? -ne 0 ]; then
 		printf "The \"emerge -uDN --with-bdeps=y world\" operation failed. Log is included below:\n\n" >>"$TMP"/update.email
 		cat "$TMP"/update.log >>"$TMP"/update.email
@@ -241,6 +241,11 @@ function gentooupdate_version
 #
 EMAIL_ERROR=""
 EMAIL_LOG=""
+SYNC_ARGS="--sync"
+UPDATE_ARGS="-uDN --with-bdeps=y world"
+REPRESERVE_ARGS="@preserved-rebuild"
+DEPCLEAN_ARGS="--depclean"
+REVDEP_ARGS=""
 DEBUG=false
 NICE=0
 TMP="/tmp"
