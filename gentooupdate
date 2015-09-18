@@ -34,7 +34,7 @@ function gentooupdate_abort_if_news
 	if [ $NEWS -ne 0 ]; then
 		printf "This update was aborted because there is unread news:\n\n" >>"$TMP"/news.email
 		eselect news list >>"$TMP"/news.email
-		gentooupdate_email "$EMAIL_ERROR" "$HOSTNAME: update aborted on $NOW" "$TMP"/news.email
+		gentooupdate_email $EMAIL_ERROR "$HOSTNAME: update aborted on $NOW" "$TMP"/news.email
 		gentooupdate_exit 1 "Update aborted because there is unread news"
 	fi
 }
@@ -51,10 +51,27 @@ function gentooupdate_check_dependencies
 	done
 }
 
+# \brief Cleans the system by removing packages that are not associated with explicitly merged packages
+function gentooupdate_depclean
+{
+	echo "gentooupdate_depclean" "$@" >> "$LOG"
+	local NOW=`date --rfc-3339=seconds`
+	local FAIL=0
+	
+	rm -f "$TMP"/depclean.log
+	emerge --depclean >>"$TMP"/depclean.log 2>>"$TMP"/depclean.log
+	if [ $? -ne 0 ]; then
+		printf "The \"emerge --depclean\" operation failed. Log is included below:\n\n" >>"$TMP"/depclean.email
+		cat "$TMP"/depclean.log >>"$TMP"/depclean.email
+		gentooupdate_email $EMAIL_ERROR "$HOSTNAME: update failed on $NOW" "$TMP"/depclean.email
+		gentooupdate_exit 4 "The \"emerge --depclean\" operation failed"
+	fi
+}
+
 # \brief Sends an email
 # \param $1 The e-mail address
 # \param $2 The subject
-# \param $3 The message
+# \param $3 The containing the message
 function gentooupdate_email
 {
 	echo "gentooupdate_email" "$@" >> "$LOG"
@@ -128,47 +145,68 @@ function gentooupdate_main
 	local NOW=`date --rfc-3339=seconds`
 	local FAIL=0
 	
-	gentooupdate_abort_if_news
+	gentooupdate_sync
+	gentooupdate_update
+	gentooupdate_depclean
+	gentooupdate_revdep
+	
+	printf "The update completed successfully.\n" > "$TMP"/success.email
+	gentooupdate_email $EMAIL_LOG "$HOSTNAME: update completed successfully on $NOW" "$TMP"/success.email
+}
 
-	rm -f "$TMP"/emerge.log
-	emerge --sync >>"$TMP"/emerge.log 2>>"$TMP"/emerge.log
-	if [ $? -ne 0 ]; then
-		printf "The \"emerge --sync\" operation failed. Log is included below:\n\n" >>"$TMP"/emerge.email
-		cat "$TMP"/emerge.log >>"$TMP"/emerge.email
-		cat "$TMP"/emerge.email | mail -s "$HOSTNAME: update failed on $NOW" $EMAIL_ERROR
-		gentooupdate_exit 2 "The \"emerge --sync\" operation failed"
-	fi
-
-	gentooupdate_abort_if_news
-
-	rm -f "$TMP"/emerge.log
-	emerge -uDN --with-bdeps=y world >>"$TMP"/emerge.log 2>>"$TMP"/emerge.log
-	if [ $? -ne 0 ]; then
-		printf "The \"emerge -uDN --with-bdeps=y world\" operation failed. Log is included below:\n\n" >>"$TMP"/emerge.email
-		cat "$TMP"/emerge.log >>"$TMP"/emerge.email
-		cat "$TMP"/emerge.email | mail -s "$HOSTNAME: update failed on $NOW" $EMAIL_ERROR
-		gentooupdate_exit 3 "The \"emerge -uDN --with-bdeps=y world\" operation failed"
-	fi
-
-	rm -f "$TMP"/emerge.log
-	emerge --depclean >>"$TMP"/emerge.log 2>>"$TMP"/emerge.log
-	if [ $? -ne 0 ]; then
-		printf "The \"emerge --depclean\" operation failed. Log is included below:\n\n" >>"$TMP"/emerge.email
-		cat "$TMP"/emerge.log >>"$TMP"/emerge.email
-		cat "$TMP"/emerge.email | mail -s "$HOSTNAME: update failed on $NOW" $EMAIL_ERROR
-		gentooupdate_exit 4 "The \"emerge --depclean\" operation failed"
-	fi
-
+# \brief Re-emerge broken binaries and shared libraries
+function gentooupdate_revdep
+{
+	echo "gentooupdate_revdep" "$@" >> "$LOG"
+	local NOW=`date --rfc-3339=seconds`
+	local FAIL=0
+	
 	rm -f "$TMP"/revdep-rebuild.log
 	revdep-rebuild >>"$TMP"/revdep-rebuild.log 2>>"$TMP"/revdep-rebuild.log
 	if [ $? -ne 0 ]; then
 		printf "The \"revdep-rebuild\" operation failed. Log is included below:\n\n" >>"$TMP"/revdep-rebuild.email
 		cat "$TMP"/revdep-rebuild.log >>"$TMP"/revdep-rebuild.email
-		cat "$TMP"/revdep-rebuild.email | mail -s "$HOSTNAME: update failed on $NOW" $EMAIL_ERROR
+		gentooupdate_email $EMAIL_ERROR "$HOSTNAME: update failed on $NOW" "$TMP"/revdep-rebuild.email
 		gentooupdate_exit 5 "The \"revdep-rebuild\" operation failed"
 	fi
+}
+
+# \brief Synchronizes portage repositories
+function gentooupdate_sync
+{
+	echo "gentooupdate_sync" "$@" >> "$LOG"
+	local NOW=`date --rfc-3339=seconds`
+	local FAIL=0
 	
-	printf "The update completed successfully.\n" | mail -s "$HOSTNAME: update completed successfully on $NOW" $EMAIL_LOG
+	gentooupdate_abort_if_news
+
+	rm -f "$TMP"/sync.log
+	emerge --sync >>"$TMP"/sync.log 2>>"$TMP"/sync.log
+	if [ $? -ne 0 ]; then
+		printf "The \"emerge --sync\" operation failed. Log is included below:\n\n" >>"$TMP"/sync.email
+		cat "$TMP"/sync.log >>"$TMP"/sync.email
+		gentooupdate_email $EMAIL_ERROR "$HOSTNAME: update failed on $NOW" "$TMP"/sync.email
+		gentooupdate_exit 2 "The \"emerge --sync\" operation failed"
+	fi
+}
+
+# \brief Update packages
+function gentooupdate_update
+{
+	echo "gentooupdate_update" "$@" >> "$LOG"
+	local NOW=`date --rfc-3339=seconds`
+	local FAIL=0
+	
+	gentooupdate_abort_if_news
+
+	rm -f "$TMP"/update.log
+	emerge -uDN --with-bdeps=y world >>"$TMP"/update.log 2>>"$TMP"/update.log
+	if [ $? -ne 0 ]; then
+		printf "The \"emerge -uDN --with-bdeps=y world\" operation failed. Log is included below:\n\n" >>"$TMP"/update.email
+		cat "$TMP"/update.log >>"$TMP"/update.email
+		gentooupdate_email $EMAIL_ERROR "$HOSTNAME: update failed on $NOW" "$TMP"/update.email
+		gentooupdate_exit 3 "The \"emerge -uDN --with-bdeps=y world\" operation failed"
+	fi
 }
 
 # \brief Prints out the version and copyright and exits this program
