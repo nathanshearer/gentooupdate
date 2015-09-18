@@ -147,11 +147,31 @@ function gentooupdate_main
 	
 	gentooupdate_sync
 	gentooupdate_update
+	gentooupdate_represerve
 	gentooupdate_depclean
 	gentooupdate_revdep
 	
 	printf "The update completed successfully.\n" > "$TMP"/success.email
 	gentooupdate_email $EMAIL_LOG "$HOSTNAME: update completed successfully on $NOW" "$TMP"/success.email
+}
+
+# \brief Rebuilds packages with preserved libraries
+function gentooupdate_represerve
+{
+	echo "gentooupdate_represerve" "$@" >> "$LOG"
+	local NOW=`date --rfc-3339=seconds`
+	local FAIL=0
+	
+	gentooupdate_abort_if_news
+
+	rm -f "$TMP"represerve
+	emerge @preserved-rebuild >>"$TMP"/represerve.log 2>>"$TMP"/represerve.log
+	if [ $? -ne 0 ]; then
+		printf "The \"emerge @preserved-rebuild\" operation failed. Log is included below:\n\n" >>"$TMP"/represerve.email
+		cat "$TMP"/represerve.log >>"$TMP"/represerve.email
+		gentooupdate_email $EMAIL_ERROR "$HOSTNAME: update failed on $NOW" "$TMP"/represerve.email
+		gentooupdate_exit 3 "The \"emerge @preserved-rebuild\" operation failed"
+	fi
 }
 
 # \brief Re-emerge broken binaries and shared libraries
