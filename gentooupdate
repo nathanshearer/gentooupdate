@@ -27,6 +27,16 @@ CODENAME="gentooupdate"
 COPYRIGHT="Copyright (C) 2015 Nathan Shearer"
 VERSION="1.0.0.0"
 
+# \brief Aborts the update if another instance of emerge is running
+function gentooupdate_abort_if_emerging
+{
+	if ps -C emerge >/dev/null 2>&1; then
+		printf "This update was aborted because another instance of emerge is running.\n" >>"$TMP"/emerging.email
+		gentooupdate_email $EMAIL_ERROR "$HOSTNAME: update aborted on $NOW" "$TMP"/emerging.email
+		gentooupdate_exit 1 "Update aborted because another instance of emerge is running"
+	fi
+}
+
 # \brief Aborts the update if there is any news
 function gentooupdate_abort_if_news
 {
@@ -71,11 +81,11 @@ function gentooupdate_depclean
 # \brief Sends an email
 # \param $1 The e-mail address
 # \param $2 The subject
-# \param $3 The containing the message
+# \param $3 The file containing the message
 function gentooupdate_email
 {
 	echo "gentooupdate_email" "$@" >> "$LOG"
-	if [ "$1" != "" ]; then
+	if [ $# -eq 3 -a "$1" != "" ]; then
 		cat "$3" | mail -s "$2" "$1"
 	fi
 }
@@ -145,6 +155,7 @@ function gentooupdate_main
 	local NOW=`date --rfc-3339=seconds`
 	local FAIL=0
 	
+	gentooupdate_abort_if_emerging
 	gentooupdate_sync
 	gentooupdate_update
 	gentooupdate_represerve
