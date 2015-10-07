@@ -66,7 +66,6 @@ function gentooupdate_depclean
 {
 	echo "gentooupdate_depclean" "$@" >> "$LOG"
 	local NOW=`date --rfc-3339=seconds`
-	local FAIL=0
 	
 	rm -f "$TMP"/depclean.log
 	emerge $DEPCLEAN_ARGS >>"$TMP"/depclean.log 2>>"$TMP"/depclean.log
@@ -153,7 +152,6 @@ function gentooupdate_main
 {
 	echo "gentooupdate_email" "$@" >> "$LOG"
 	local NOW=`date --rfc-3339=seconds`
-	local FAIL=0
 	
 	gentooupdate_abort_if_emerging
 	gentooupdate_sync
@@ -171,7 +169,6 @@ function gentooupdate_represerve
 {
 	echo "gentooupdate_represerve" "$@" >> "$LOG"
 	local NOW=`date --rfc-3339=seconds`
-	local FAIL=0
 	
 	gentooupdate_abort_if_news
 
@@ -190,7 +187,6 @@ function gentooupdate_revdep
 {
 	echo "gentooupdate_revdep" "$@" >> "$LOG"
 	local NOW=`date --rfc-3339=seconds`
-	local FAIL=0
 	
 	rm -f "$TMP"/revdep-rebuild.log
 	revdep-rebuild $REVDEP_ARGS >>"$TMP"/revdep-rebuild.log 2>>"$TMP"/revdep-rebuild.log
@@ -207,7 +203,6 @@ function gentooupdate_sync
 {
 	echo "gentooupdate_sync" "$@" >> "$LOG"
 	local NOW=`date --rfc-3339=seconds`
-	local FAIL=0
 	
 	gentooupdate_abort_if_news
 
@@ -226,7 +221,6 @@ function gentooupdate_update
 {
 	echo "gentooupdate_update" "$@" >> "$LOG"
 	local NOW=`date --rfc-3339=seconds`
-	local FAIL=0
 	
 	gentooupdate_abort_if_news
 
