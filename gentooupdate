@@ -25,6 +25,7 @@
 NAME="Gentoo Update"
 CODENAME="gentooupdate"
 COPYRIGHT="Copyright (C) 2015 Nathan Shearer"
+LICENSE="GNU General Public License 2.0"
 VERSION="1.0.0.0"
 
 # \brief Aborts the update if another instance of emerge is running
@@ -127,7 +128,9 @@ function gentooupdate_exit
 # \brief Displays the help and exits the program
 function gentooupdate_help
 {
-	echo "$NAME $VERSION $COPYRIGHT"
+	echo "$NAME $VERSION"
+	echo "$COPYRIGHT"
+	echo "Licensed under $LICENSE"
 	echo "This script automatically updates Gentoo Linux."
 	echo "Usage:"
 	echo "  $CODENAME [options]"
