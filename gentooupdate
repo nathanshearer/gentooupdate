@@ -30,22 +30,26 @@ VERSION="1.0.0.0"
 # \brief Aborts the update if another instance of emerge is running
 function gentooupdate_abort_if_emerging
 {
-	if ps -C emerge >/dev/null 2>&1; then
-		printf "This update was aborted because another instance of emerge is running.\n" >>"$TMP"/emerging.email
-		gentooupdate_email $EMAIL_ERROR "$HOSTNAME: update aborted on $NOW" "$TMP"/emerging.email
-		gentooupdate_exit 1 "Update aborted because another instance of emerge is running"
+	if $AUTO_ABORT; then
+		if ps -C emerge >/dev/null 2>&1; then
+			printf "This update was aborted because another instance of emerge is running.\n" >>"$TMP"/emerging.email
+			gentooupdate_email $EMAIL_ERROR "$HOSTNAME: update aborted on $NOW" "$TMP"/emerging.email
+			gentooupdate_exit 1 "Update aborted because another instance of emerge is running"
+		fi
 	fi
 }
 
 # \brief Aborts the update if there is any news
 function gentooupdate_abort_if_news
 {
-	NEWS=`eselect news count`
-	if [ $NEWS -ne 0 ]; then
-		printf "This update was aborted because there is unread news:\n\n" >>"$TMP"/news.email
-		eselect news list >>"$TMP"/news.email
-		gentooupdate_email $EMAIL_ERROR "$HOSTNAME: update aborted on $NOW" "$TMP"/news.email
-		gentooupdate_exit 1 "Update aborted because there is unread news"
+	if $AUTO_ABORT; then
+		NEWS=`eselect news count`
+		if [ $NEWS -ne 0 ]; then
+			printf "This update was aborted because there is unread news:\n\n" >>"$TMP"/news.email
+			eselect news list >>"$TMP"/news.email
+			gentooupdate_email $EMAIL_ERROR "$HOSTNAME: update aborted on $NOW" "$TMP"/news.email
+			gentooupdate_exit 1 "Update aborted because there is unread news"
+		fi
 	fi
 }
 
@@ -127,13 +131,25 @@ function gentooupdate_help
 	printf "Usage:\n"
 	printf "  $CODENAME [options]\n"
 	printf "Options:\n"
+	printf "  -a true\n"
+	printf "    Abort if there is unread news or if emerge is already running.\n"
+	printf "  -d \"--depclean\"\n"
+	printf "    The arguments passed to emerge during the depclean phase.\n"
+	printf "  -e \"\"\n"
+	printf "    The arguments passed to revdep-rebuild during the revdep phase.\n"
 	printf "  -h\n"
 	printf "    Display this help message and exit.\n"
 	printf "  -n N\n"
 	printf "    Sets the niceness to N (default 0).\n"
+	printf "  -r \"@preserved-rebuild\"\n"
+	printf "    The arguments passed to emerge during the represerve phase.\n"
+	printf "  -s \"--sync\"\n"
+	printf "    The arguments passed to emerge during the sync phase.\n"
+	printf "  -u \"-uDN --with-bdeps=y world\"\n"
+	printf "    The arguments passed to emerge during the update phase.\n"
 	printf "Examples:\n"
-	printf "  $CODENAME -h\n"
-	printf "  $CODENAME -n 5\n"
+	printf "  $CODENAME -a false\n"
+	printf "  $CODENAME -n 20 -u \"-uDN --with-bdeps=y --keep-going world\"\n"
 	exit
 }
 
@@ -160,7 +176,10 @@ function gentooupdate_main
 	gentooupdate_depclean
 	gentooupdate_revdep
 	
-	printf "The update completed successfully.\n" > "$TMP"/success.email
+	echo "The update completed successfully." > "$TMP"/success.email
+	echo >> "$TMP"/success.email
+	cat "$TMP"/update.log >> "$TMP"/success.email
+	
 	gentooupdate_email $EMAIL_LOG "$HOSTNAME: update completed successfully on $NOW" "$TMP"/success.email
 }
 
@@ -246,8 +265,9 @@ function gentooupdate_version
 #
 EMAIL_ERROR=""
 EMAIL_LOG=""
+AUTO_ABORT=true
 SYNC_ARGS="--sync"
-UPDATE_ARGS="-uDN --with-bdeps=y world"
+UPDATE_ARGS="-uDN --with-bdeps=y --backtrack=64 --quiet-build world"
 REPRESERVE_ARGS="@preserved-rebuild"
 DEPCLEAN_ARGS="--depclean"
 REVDEP_ARGS=""
@@ -268,10 +288,16 @@ fi
 #------------------------------------------------------------------------------
 # command line arguments
 #
-while getopts "hn:" OPTION; do
+while getopts "a:d:hn:r:s:u:" OPTION; do
 	case "$OPTION" in
+		"a") AUTO_ABORT="$OPTARG";;
+		"d") DEPCLEAN_ARGS="$OPTARG";;
+		"e") REVDEP_ARGS="$OPTARG";;
 		"h") gentooupdate_help;;
 		"n") NICE="$OPTARG";;
+		"r") REPRESERVE_ARGS="$OPTARG";;
+		"s") SYNC_ARGS="$OPTARG";;
+		"u") UPDATE_ARGS="$OPTARG";;
 		*) gentooupdate_help;;
 	esac
 done
