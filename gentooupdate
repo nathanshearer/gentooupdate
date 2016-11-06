@@ -1,32 +1,10 @@
 #!/usr/bin/env bash
 
-#----------------------------------------------------------------------------
-# Gentoo Update
-# Copyright (C) 2015 Nathan Shearer
-#
-# This program is free software; you can redistribute it and/or modify it
-# under the terms of the GNU General Public License version 2 as published by
-# the Free Software Foundation.
-#
-# This program is distributed in the hope that it will be useful, but WITHOUT
-# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-# more details.
-#
-# You should have received a copy of the GNU General Public License along
-# with this program; if not, write to:
-#   The Free Software Foundation Inc.
-#   51 Franklin Street
-#   Fifth Floor
-#   Boston, MA
-#   02110-1301
-#   USA
-
 NAME="Gentoo Update"
 CODENAME="gentooupdate"
 COPYRIGHT="Copyright (C) 2015 Nathan Shearer"
 LICENSE="GNU General Public License 2.0"
-VERSION="1.0.0.0"
+VERSION="1.1.0.0"
 
 # \brief Aborts the update if another instance of emerge is running
 function gentooupdate_abort_if_emerging
@@ -34,7 +12,7 @@ function gentooupdate_abort_if_emerging
 	if $AUTO_ABORT; then
 		if ps -C emerge >/dev/null 2>&1; then
 			echo "This update was aborted because another instance of emerge is running." >>"$TMP"/emerging.email
-			gentooupdate_email $EMAIL_ERROR "$HOSTNAME: update aborted on $NOW" "$TMP"/emerging.email
+			gentooupdate_email $EMAIL_ERROR $(hostname --fqdn)": update aborted on $NOW" "$TMP"/emerging.email
 			gentooupdate_exit 1 "Update aborted because another instance of emerge is running"
 		fi
 	fi
@@ -49,7 +27,7 @@ function gentooupdate_abort_if_news
 			echo "This update was aborted because there is unread news:" >>"$TMP"/news.email
 			echo >>"$TMP"/news.email
 			eselect news list >>"$TMP"/news.email
-			gentooupdate_email $EMAIL_ERROR "$HOSTNAME: update aborted on $NOW" "$TMP"/news.email
+			gentooupdate_email $EMAIL_ERROR $(hostname --fqdn)": update aborted on $NOW" "$TMP"/news.email
 			gentooupdate_exit 1 "Update aborted because there is unread news"
 		fi
 	fi
@@ -79,7 +57,7 @@ function gentooupdate_depclean
 		echo "The \"emerge --depclean\" operation failed. Log is included below:" >>"$TMP"/depclean.email
 		echo >>"$TMP"/depclean.email
 		cat "$TMP"/depclean.log >>"$TMP"/depclean.email
-		gentooupdate_email $EMAIL_ERROR "$HOSTNAME: update failed on $NOW" "$TMP"/depclean.email
+		gentooupdate_email $EMAIL_ERROR $(hostname --fqdn)": update failed on $NOW" "$TMP"/depclean.email
 		gentooupdate_exit 4 "The \"emerge --depclean\" operation failed"
 	fi
 }
@@ -128,32 +106,44 @@ function gentooupdate_exit
 # \brief Displays the help and exits the program
 function gentooupdate_help
 {
-	echo "$NAME $VERSION"
-	echo "$COPYRIGHT"
-	echo "Licensed under $LICENSE"
-	echo "This script automatically updates Gentoo Linux."
+	#     01234567890123456789012345678901234567890123456789012345678901234567890123456789
+	echo "Synopsis"
+	echo "  Automatically update Gentoo Linux in phases:"
+	echo "    sync"
+	echo "    update"
+	echo "    preservedrebuild"
+	echo "    depclean"
+	echo "    revdep"
+	echo
 	echo "Usage:"
 	echo "  $CODENAME [options]"
+	echo
 	echo "Options:"
 	echo "  -a true"
 	echo "    Abort if there is unread news or if emerge is already running."
 	echo "  -d \"--depclean\""
 	echo "    The arguments passed to emerge during the depclean phase."
 	echo "  -e \"\""
-	echo "    The arguments passed to revdep-rebuild during the revdep phase."
+	echo "    The arguments passed to revdep-rebuild during the revdeprebuild phase."
 	echo "  -h"
 	echo "    Display this help message and exit."
 	echo "  -n N"
 	echo "    Sets the niceness to N (default 0)."
 	echo "  -r \"@preserved-rebuild\""
-	echo "    The arguments passed to emerge during the represerve phase."
+	echo "    The arguments passed to emerge during the preservedrebuild phase."
 	echo "  -s \"--sync\""
 	echo "    The arguments passed to emerge during the sync phase."
 	echo "  -u \"-uDN --with-bdeps=y world\""
 	echo "    The arguments passed to emerge during the update phase."
+	echo
 	echo "Examples:"
 	echo "  $CODENAME -a false"
 	echo "  $CODENAME -n 20 -u \"-uDN --with-bdeps=y --keep-going world\""
+	echo
+	echo "Version:"
+	echo "  $NAME $VERSION"
+	echo "  $COPYRIGHT"
+	echo "  Licensed under $LICENSE"
 	exit
 }
 
@@ -176,49 +166,49 @@ function gentooupdate_main
 	gentooupdate_abort_if_emerging
 	gentooupdate_sync
 	gentooupdate_update
-	gentooupdate_represerve
+	gentooupdate_preservedrebuild
 	gentooupdate_depclean
-	gentooupdate_revdep
+	gentooupdate_revdeprebuild
 	
 	echo "The update completed successfully." > "$TMP"/success.email
 	echo >> "$TMP"/success.email
 	cat "$TMP"/update.log >> "$TMP"/success.email
 	
-	gentooupdate_email $EMAIL_LOG "$HOSTNAME: update completed successfully on $NOW" "$TMP"/success.email
+	gentooupdate_email $EMAIL_LOG $(hostname --fqdn)": update completed successfully on $NOW" "$TMP"/success.email
 }
 
 # \brief Rebuilds packages with preserved libraries
-function gentooupdate_represerve
+function gentooupdate_preservedrebuild
 {
-	echo "gentooupdate_represerve" "$@" >> "$LOG"
+	echo "gentooupdate_preservedrebuild" "$@" >> "$LOG"
 	local NOW=`date --rfc-3339=seconds`
 	
 	gentooupdate_abort_if_news
 
-	rm -f "$TMP"represerve
-	emerge $REPRESERVE_ARGS >>"$TMP"/represerve.log 2>>"$TMP"/represerve.log
+	rm -f "$TMP"preservedrebuild
+	emerge $REPRESERVE_ARGS >>"$TMP"/preservedrebuild.log 2>>"$TMP"/preservedrebuild.log
 	if [ $? -ne 0 ]; then
-		echo "The \"emerge @preserved-rebuild\" operation failed. Log is included below:" >>"$TMP"/represerve.email
-		echo >>"$TMP"/represerve.email
-		cat "$TMP"/represerve.log >>"$TMP"/represerve.email
-		gentooupdate_email $EMAIL_ERROR "$HOSTNAME: update failed on $NOW" "$TMP"/represerve.email
+		echo "The \"emerge @preserved-rebuild\" operation failed. Log is included below:" >>"$TMP"/preservedrebuild.email
+		echo >>"$TMP"/preservedrebuild.email
+		cat "$TMP"/preservedrebuild.log >>"$TMP"/preservedrebuild.email
+		gentooupdate_email $EMAIL_ERROR $(hostname --fqdn)": update failed on $NOW" "$TMP"/preservedrebuild.email
 		gentooupdate_exit 3 "The \"emerge @preserved-rebuild\" operation failed"
 	fi
 }
 
 # \brief Re-emerge broken binaries and shared libraries
-function gentooupdate_revdep
+function gentooupdate_revdeprebuild
 {
-	echo "gentooupdate_revdep" "$@" >> "$LOG"
+	echo "gentooupdate_revdeprebuild" "$@" >> "$LOG"
 	local NOW=`date --rfc-3339=seconds`
 	
-	rm -f "$TMP"/revdep-rebuild.log
-	revdep-rebuild $REVDEP_ARGS >>"$TMP"/revdep-rebuild.log 2>>"$TMP"/revdep-rebuild.log
+	rm -f "$TMP"/revdeprebuild.log
+	revdep-rebuild $REVDEP_ARGS >>"$TMP"/revdeprebuild.log 2>>"$TMP"/revdeprebuild.log
 	if [ $? -ne 0 ]; then
-		echo "The \"revdep-rebuild\" operation failed. Log is included below:" >>"$TMP"/revdep-rebuild.email
-		echo >>"$TMP"/revdep-rebuild.email
-		cat "$TMP"/revdep-rebuild.log >>"$TMP"/revdep-rebuild.email
-		gentooupdate_email $EMAIL_ERROR "$HOSTNAME: update failed on $NOW" "$TMP"/revdep-rebuild.email
+		echo "The \"revdep-rebuild\" operation failed. Log is included below:" >>"$TMP"/revdeprebuild.email
+		echo >>"$TMP"/revdeprebuild.email
+		cat "$TMP"/revdeprebuild.log >>"$TMP"/revdeprebuild.email
+		gentooupdate_email $EMAIL_ERROR $(hostname --fqdn)": update failed on $NOW" "$TMP"/revdeprebuild.email
 		gentooupdate_exit 5 "The \"revdep-rebuild\" operation failed"
 	fi
 }
@@ -237,7 +227,7 @@ function gentooupdate_sync
 		echo "The \"emerge --sync\" operation failed. Log is included below:" >>"$TMP"/sync.email
 		echo >>"$TMP"/sync.email
 		cat "$TMP"/sync.log >>"$TMP"/sync.email
-		gentooupdate_email $EMAIL_ERROR "$HOSTNAME: update failed on $NOW" "$TMP"/sync.email
+		gentooupdate_email $EMAIL_ERROR $(hostname --fqdn)": update failed on $NOW" "$TMP"/sync.email
 		gentooupdate_exit 2 "The \"emerge --sync\" operation failed"
 	fi
 }
@@ -256,7 +246,7 @@ function gentooupdate_update
 		echo "The \"emerge -uDN --with-bdeps=y world\" operation failed. Log is included below:" >>"$TMP"/update.email
 		echo >>"$TMP"/update.email
 		cat "$TMP"/update.log >>"$TMP"/update.email
-		gentooupdate_email $EMAIL_ERROR "$HOSTNAME: update failed on $NOW" "$TMP"/update.email
+		gentooupdate_email $EMAIL_ERROR $(hostname --fqdn)": update failed on $NOW" "$TMP"/update.email
 		gentooupdate_exit 3 "The \"emerge -uDN --with-bdeps=y world\" operation failed"
 	fi
 }
@@ -268,7 +258,7 @@ EMAIL_ERROR=""
 EMAIL_LOG=""
 AUTO_ABORT=true
 SYNC_ARGS="--sync"
-UPDATE_ARGS="-uDN --with-bdeps=y --backtrack=64 --quiet-build world"
+UPDATE_ARGS="-uDN --with-bdeps=y --complete-graph --backtrack=65536 --quiet --verbose-conflicts world"
 REPRESERVE_ARGS="@preserved-rebuild"
 DEPCLEAN_ARGS="--depclean"
 REVDEP_ARGS=""
