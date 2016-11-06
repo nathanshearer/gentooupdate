@@ -4,7 +4,7 @@ NAME="Gentoo Update"
 CODENAME="gentooupdate"
 COPYRIGHT="Copyright (C) 2015 Nathan Shearer"
 LICENSE="GNU General Public License 2.0"
-VERSION="1.1.0.0"
+VERSION="1.1.1.0"
 
 # \brief Aborts the update if another instance of emerge is running
 function gentooupdate_abort_if_emerging
@@ -113,7 +113,7 @@ function gentooupdate_help
 	echo "    update"
 	echo "    preservedrebuild"
 	echo "    depclean"
-	echo "    revdep"
+	echo "    revdeprebuild"
 	echo
 	echo "Usage:"
 	echo "  $CODENAME [options]"
