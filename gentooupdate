@@ -107,7 +107,7 @@ function gentooupdate_exit
 function gentooupdate_help
 {
 	#     01234567890123456789012345678901234567890123456789012345678901234567890123456789
-	echo "Synopsis"
+	echo "Synopsis:"
 	echo "  Automatically update Gentoo Linux in phases:"
 	echo "    sync"
 	echo "    update"
