@@ -1,4 +1,4 @@
-Synopsis
+Description:
   Automatically update Gentoo Linux in phases:
     sync
     update
@@ -32,6 +32,6 @@ Examples:
   gentooupdate -n 20 -u "-uDN --with-bdeps=y --keep-going world"
 
 Version:
-  Gentoo Update 1.1.1.0
+  Gentoo Update 1.1.2.0
   Copyright (C) 2015 Nathan Shearer
   Licensed under GNU General Public License 2.0

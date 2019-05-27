@@ -1,11 +1,5 @@
 #!/usr/bin/env bash
 
-NAME="Gentoo Update"
-CODENAME="gentooupdate"
-COPYRIGHT="Copyright (C) 2015 Nathan Shearer"
-LICENSE="GNU General Public License 2.0"
-VERSION="1.1.1.0"
-
 # \brief Aborts the update if another instance of emerge is running
 function gentooupdate_abort_if_emerging
 {
@@ -22,7 +16,7 @@ function gentooupdate_abort_if_emerging
 function gentooupdate_abort_if_news
 {
 	if $AUTO_ABORT; then
-		NEWS=`eselect news count`
+		NEWS=$(eselect news count)
 		if [ $NEWS -ne 0 ]; then
 			echo "This update was aborted because there is unread news:" >>"$TMP"/news.email
 			echo >>"$TMP"/news.email
@@ -40,7 +34,7 @@ function gentooupdate_check_dependencies
 	for TOOL in "$@"; do
 		if ! type "$TOOL" >/dev/null 2>/dev/null; then
 			echo "$CODENAME: \"$TOOL\" is required for this application to work correctly." >&2
-			exit
+			exit 1
 		fi
 	done
 }
@@ -49,7 +43,7 @@ function gentooupdate_check_dependencies
 function gentooupdate_depclean
 {
 	echo "gentooupdate_depclean" "$@" >> "$LOG"
-	local NOW=`date --rfc-3339=seconds`
+	local NOW=$(date --rfc-3339=seconds)
 	
 	rm -f "$TMP"/depclean.log
 	emerge $DEPCLEAN_ARGS >>"$TMP"/depclean.log 2>>"$TMP"/depclean.log
@@ -107,7 +101,7 @@ function gentooupdate_exit
 function gentooupdate_help
 {
 	#     01234567890123456789012345678901234567890123456789012345678901234567890123456789
-	echo "Synopsis:"
+	echo "Description:"
 	echo "  Automatically update Gentoo Linux in phases:"
 	echo "    sync"
 	echo "    update"
@@ -144,7 +138,7 @@ function gentooupdate_help
 	echo "  $NAME $VERSION"
 	echo "  $COPYRIGHT"
 	echo "  Licensed under $LICENSE"
-	exit
+	exit 1
 }
 
 # \brief Logs messages to syslog with logger
@@ -161,7 +155,7 @@ function gentooupdate_log
 function gentooupdate_main
 {
 	echo "gentooupdate_email" "$@" >> "$LOG"
-	local NOW=`date --rfc-3339=seconds`
+	local NOW=$(date --rfc-3339=seconds)
 	
 	gentooupdate_abort_if_emerging
 	gentooupdate_sync
@@ -181,11 +175,11 @@ function gentooupdate_main
 function gentooupdate_preservedrebuild
 {
 	echo "gentooupdate_preservedrebuild" "$@" >> "$LOG"
-	local NOW=`date --rfc-3339=seconds`
+	local NOW=$(date --rfc-3339=seconds)
 	
 	gentooupdate_abort_if_news
 
-	rm -f "$TMP"preservedrebuild
+	rm -f "$TMP"/preservedrebuild
 	emerge $REPRESERVE_ARGS >>"$TMP"/preservedrebuild.log 2>>"$TMP"/preservedrebuild.log
 	if [ $? -ne 0 ]; then
 		echo "The \"emerge @preserved-rebuild\" operation failed. Log is included below:" >>"$TMP"/preservedrebuild.email
@@ -200,7 +194,7 @@ function gentooupdate_preservedrebuild
 function gentooupdate_revdeprebuild
 {
 	echo "gentooupdate_revdeprebuild" "$@" >> "$LOG"
-	local NOW=`date --rfc-3339=seconds`
+	local NOW=$(date --rfc-3339=seconds)
 	
 	rm -f "$TMP"/revdeprebuild.log
 	revdep-rebuild $REVDEP_ARGS >>"$TMP"/revdeprebuild.log 2>>"$TMP"/revdeprebuild.log
@@ -217,7 +211,7 @@ function gentooupdate_revdeprebuild
 function gentooupdate_sync
 {
 	echo "gentooupdate_sync" "$@" >> "$LOG"
-	local NOW=`date --rfc-3339=seconds`
+	local NOW=$(date --rfc-3339=seconds)
 	
 	gentooupdate_abort_if_news
 
@@ -236,7 +230,7 @@ function gentooupdate_sync
 function gentooupdate_update
 {
 	echo "gentooupdate_update" "$@" >> "$LOG"
-	local NOW=`date --rfc-3339=seconds`
+	local NOW=$(date --rfc-3339=seconds)
 	
 	gentooupdate_abort_if_news
 
@@ -252,8 +246,17 @@ function gentooupdate_update
 }
 
 #------------------------------------------------------------------------------
+# hard coded variables
+
+NAME="Gentoo Update"
+CODENAME="gentooupdate"
+COPYRIGHT="Copyright (C) 2015 Nathan Shearer"
+LICENSE="GNU General Public License 2.0"
+VERSION="1.1.2.0"
+
+#------------------------------------------------------------------------------
 # default configuration
-#
+
 EMAIL_ERROR=""
 EMAIL_LOG=""
 AUTO_ABORT=true
@@ -268,7 +271,7 @@ TMP="/tmp"
 
 #------------------------------------------------------------------------------
 # config files
-#
+
 if [ -r /etc/$CODENAME.conf ]; then
 	. /etc/$CODENAME.conf
 fi
@@ -278,25 +281,52 @@ fi
 
 #------------------------------------------------------------------------------
 # command line arguments
-#
-while getopts "a:d:hn:r:s:u:" OPTION; do
-	case "$OPTION" in
-		"a") AUTO_ABORT="$OPTARG";;
-		"d") DEPCLEAN_ARGS="$OPTARG";;
-		"e") REVDEP_ARGS="$OPTARG";;
-		"h") gentooupdate_help;;
-		"n") NICE="$OPTARG";;
-		"r") REPRESERVE_ARGS="$OPTARG";;
-		"s") SYNC_ARGS="$OPTARG";;
-		"u") UPDATE_ARGS="$OPTARG";;
-		*) gentooupdate_help;;
+
+while [ $# -ne 0 ]; do
+	case "$1" in
+		"-a")
+			AUTO_ABORT="$2"
+			shift 2
+			;;
+		"-d")
+			DEPCLEAN_ARGS="$2"
+			shift 2
+			;;
+		"-e")
+			REVDEP_ARGS="$2"
+			shift 2
+			;;
+		"-h")
+			gentooupdate_help
+			exit 1
+			;;
+		"-n")
+			NICE="$2"
+			shift 2
+			;;
+		"-r")
+			REPRESERVE_ARGS="$2"
+			shift 2
+			;;
+		"-s")
+			SYNC_ARGS="$2"
+			shift 2
+			;;
+		"-u")
+			UPDATE_ARGS="$2"
+			shift 2
+			;;
+		*)
+			echo "error: unrecognized argument \"$1\""
+			exit 1
+			break;;
 	esac
 done
-shift $(( $OPTIND - 1 ))
 
 #------------------------------------------------------------------------------
 # prepare environment
-#
+
+gentooupdate_check_dependencies emerge revdep-rebuild
 EXITING=false
 trap gentooupdate_exit EXIT SIGHUP SIGINT SIGQUIT SIGABRT SIGKILL SIGTERM
 TMP="$TMP/$CODENAME.$$"
@@ -307,5 +337,5 @@ renice $NICE $$ >>"$LOG" 2>>"$LOG"
 
 #------------------------------------------------------------------------------
 # begin execution
-#
+
 gentooupdate_main
