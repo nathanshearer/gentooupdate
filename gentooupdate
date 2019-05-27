@@ -6,8 +6,11 @@ function gentooupdate_abort_if_emerging
 	if $AUTO_ABORT; then
 		if ps -C emerge >/dev/null 2>&1; then
 			echo "This update was aborted because another instance of emerge is running." >>"$TMP"/emerging.email
-			gentooupdate_email $EMAIL_ERROR $(hostname --fqdn)": update aborted on $NOW" "$TMP"/emerging.email
-			gentooupdate_exit 1 "Update aborted because another instance of emerge is running"
+			gentooupdate_email $EMAIL_ERROR $HOSTNAME": update aborted on $NOW" "$TMP"/emerging.email
+			if [ $VERBOSE -ge 1 ]; then
+				echo "Update aborted because another instance of emerge is running." >&2
+			fi
+			gentooupdate_exit 1
 		fi
 	fi
 }
@@ -21,8 +24,11 @@ function gentooupdate_abort_if_news
 			echo "This update was aborted because there is unread news:" >>"$TMP"/news.email
 			echo >>"$TMP"/news.email
 			eselect news list >>"$TMP"/news.email
-			gentooupdate_email $EMAIL_ERROR $(hostname --fqdn)": update aborted on $NOW" "$TMP"/news.email
-			gentooupdate_exit 1 "Update aborted because there is unread news"
+			gentooupdate_email $EMAIL_ERROR $HOSTNAME": update aborted on $NOW" "$TMP"/news.email
+			if [ $VERBOSE -ge 1 ]; then
+				echo "Update aborted because there is unread news." >&2
+			fi
+			gentooupdate_exit 1
 		fi
 	fi
 }
@@ -51,8 +57,11 @@ function gentooupdate_depclean
 		echo "The \"emerge --depclean\" operation failed. Log is included below:" >>"$TMP"/depclean.email
 		echo >>"$TMP"/depclean.email
 		cat "$TMP"/depclean.log >>"$TMP"/depclean.email
-		gentooupdate_email $EMAIL_ERROR $(hostname --fqdn)": update failed on $NOW" "$TMP"/depclean.email
-		gentooupdate_exit 4 "The \"emerge --depclean\" operation failed"
+		gentooupdate_email $EMAIL_ERROR $HOSTNAME": update failed on $NOW" "$TMP"/depclean.email
+		if [ $VERBOSE -ge 1 ]; then
+			echo "The \"emerge $DEPCLEAN_ARGS\" operation failed." >&2
+		fi
+		gentooupdate_exit 4
 	fi
 }
 
@@ -75,16 +84,12 @@ function gentooupdate_email
 # If DEBUG=true then temporary files are not deleted.
 function gentooupdate_exit
 {
-	#echo "gentooupdate_exit" "$@" >>"$LOG"
 	if $EXITING; then return; fi
 	EXITING=true
 	local EXIT="$1"
 	local MESSAGE="$2"
 	if [ "$EXIT" = "" ]; then
 		EXIT=0
-	fi
-	if [ "$MESSAGE" = "" ]; then
-		MESSAGE="An unrecoverable error has occurred"
 	fi
 	if ! $DEBUG; then
 		rm -rf "$TMP"
@@ -93,7 +98,12 @@ function gentooupdate_exit
 	fi
 	case $EXIT in
 		0) exit;;
-		*) echo "$CODENAME: $MESSAGE" >&2; exit $EXIT;;
+		*)
+			if [ "$MESSAGE" != "" ]; then
+				echo "$CODENAME: $MESSAGE" >&2
+			fi
+			exit $EXIT
+			;;
 	esac
 }
 
@@ -108,6 +118,7 @@ function gentooupdate_help
 	echo "    preservedrebuild"
 	echo "    depclean"
 	echo "    revdeprebuild"
+	echo "    perlcleaner"
 	echo
 	echo "Usage:"
 	echo "  $CODENAME [options]"
@@ -115,20 +126,30 @@ function gentooupdate_help
 	echo "Options:"
 	echo "  -a true"
 	echo "    Abort if there is unread news or if emerge is already running."
-	echo "  -d \"--depclean\""
+	echo "  -d, --depclean-args \"--depclean\""
 	echo "    The arguments passed to emerge during the depclean phase."
 	echo "  -e \"\""
 	echo "    The arguments passed to revdep-rebuild during the revdeprebuild phase."
-	echo "  -h"
+	echo "  -h, --help"
 	echo "    Display this help message and exit."
-	echo "  -n N"
+	echo "  -l, --perl-cleaner-args \"--really-all\""
+	echo "    The arguments passed to perl-cleaner during the perlcleaner phase."
+	echo "  -n, --nice N"
 	echo "    Sets the niceness to N (default 0)."
-	echo "  -r \"@preserved-rebuild\""
+	echo "  -r, --preserved-rebuild-args \"@preserved-rebuild\""
 	echo "    The arguments passed to emerge during the preservedrebuild phase."
-	echo "  -s \"--sync\""
+	echo "  -s, --sync-args \"--sync\""
 	echo "    The arguments passed to emerge during the sync phase."
-	echo "  -u \"-uDN --with-bdeps=y world\""
+	echo "  -u, --update-args \"-uDN --with-bdeps=y world\""
 	echo "    The arguments passed to emerge during the update phase."
+	echo "  -v"
+	echo "    The same as --verbose 1."
+	echo "  --verbose #"
+	echo "    Use more or less verbose output. Valid values are from 0 to 1 inclusive:"
+	echo "      0  Default. No output"
+	echo "      1  Show errors messages"
+	#echo "      2  Show standard output for each phase"
+	#echo "      3  Enable verbose output for each phase"
 	echo
 	echo "Examples:"
 	echo "  $CODENAME -a false"
@@ -138,7 +159,6 @@ function gentooupdate_help
 	echo "  $NAME $VERSION"
 	echo "  $COPYRIGHT"
 	echo "  Licensed under $LICENSE"
-	exit 1
 }
 
 # \brief Logs messages to syslog with logger
@@ -154,7 +174,7 @@ function gentooupdate_log
 # \brief The main function of this script
 function gentooupdate_main
 {
-	echo "gentooupdate_email" "$@" >> "$LOG"
+	echo "gentooupdate_main" "$@" >> "$LOG"
 	local NOW=$(date --rfc-3339=seconds)
 	
 	gentooupdate_abort_if_emerging
@@ -163,12 +183,32 @@ function gentooupdate_main
 	gentooupdate_preservedrebuild
 	gentooupdate_depclean
 	gentooupdate_revdeprebuild
+	gentooupdate_perlcleaner
 	
 	echo "The update completed successfully." > "$TMP"/success.email
 	echo >> "$TMP"/success.email
 	cat "$TMP"/update.log >> "$TMP"/success.email
 	
-	gentooupdate_email $EMAIL_LOG $(hostname --fqdn)": update completed successfully on $NOW" "$TMP"/success.email
+	gentooupdate_email $EMAIL_LOG $HOSTNAME": update completed successfully on $NOW" "$TMP"/success.email
+}
+
+function gentooupdate_perlcleaner
+{
+	echo "gentooupdate_perlcleaner" "$@" >> "$LOG"
+	local NOW=$(date --rfc-3339=seconds)
+	
+	rm -f "$TMP"/perlcleaner.log
+	perl-cleaner $PERL_CLEANER_ARGS >>"$TMP"/perlcleaner.log 2>>"$TMP"/perlcleaner.log
+	if [ $? -ne 0 ]; then
+		echo "The \"perl-cleaner\" operation failed. Log is included below:" >>"$TMP"/perlcleaner.email
+		echo >>"$TMP"/perlcleaner.email
+		cat "$TMP"/perlcleaner.log >>"$TMP"/perlcleaner.email
+		gentooupdate_email $EMAIL_ERROR $HOSTNAME": update failed on $NOW" "$TMP"/perlcleaner.email
+		if [ $VERBOSE -ge 1 ]; then
+			echo "The \"perl-cleaner $PERL_CLEANER_ARGS\" operation failed." >&2
+		fi
+		gentooupdate_exit 5
+	fi
 }
 
 # \brief Rebuilds packages with preserved libraries
@@ -180,13 +220,16 @@ function gentooupdate_preservedrebuild
 	gentooupdate_abort_if_news
 
 	rm -f "$TMP"/preservedrebuild
-	emerge $REPRESERVE_ARGS >>"$TMP"/preservedrebuild.log 2>>"$TMP"/preservedrebuild.log
+	emerge $PRESERVED_REBUILD_ARGS >>"$TMP"/preservedrebuild.log 2>>"$TMP"/preservedrebuild.log
 	if [ $? -ne 0 ]; then
 		echo "The \"emerge @preserved-rebuild\" operation failed. Log is included below:" >>"$TMP"/preservedrebuild.email
 		echo >>"$TMP"/preservedrebuild.email
 		cat "$TMP"/preservedrebuild.log >>"$TMP"/preservedrebuild.email
-		gentooupdate_email $EMAIL_ERROR $(hostname --fqdn)": update failed on $NOW" "$TMP"/preservedrebuild.email
-		gentooupdate_exit 3 "The \"emerge @preserved-rebuild\" operation failed"
+		gentooupdate_email $EMAIL_ERROR $HOSTNAME": update failed on $NOW" "$TMP"/preservedrebuild.email
+		if [ $VERBOSE -ge 1 ]; then
+			echo "The \"emerge $PRESERVED_REBUILD_ARGS\" operation failed." >&2
+		fi
+		gentooupdate_exit 3
 	fi
 }
 
@@ -202,8 +245,11 @@ function gentooupdate_revdeprebuild
 		echo "The \"revdep-rebuild\" operation failed. Log is included below:" >>"$TMP"/revdeprebuild.email
 		echo >>"$TMP"/revdeprebuild.email
 		cat "$TMP"/revdeprebuild.log >>"$TMP"/revdeprebuild.email
-		gentooupdate_email $EMAIL_ERROR $(hostname --fqdn)": update failed on $NOW" "$TMP"/revdeprebuild.email
-		gentooupdate_exit 5 "The \"revdep-rebuild\" operation failed"
+		gentooupdate_email $EMAIL_ERROR $HOSTNAME": update failed on $NOW" "$TMP"/revdeprebuild.email
+		if [ $VERBOSE -ge 1 ]; then
+			echo "The \"revdep-rebuild $REVDEP_ARGS\" operation failed." >&2
+		fi
+		gentooupdate_exit 5
 	fi
 }
 
@@ -221,8 +267,11 @@ function gentooupdate_sync
 		echo "The \"emerge --sync\" operation failed. Log is included below:" >>"$TMP"/sync.email
 		echo >>"$TMP"/sync.email
 		cat "$TMP"/sync.log >>"$TMP"/sync.email
-		gentooupdate_email $EMAIL_ERROR $(hostname --fqdn)": update failed on $NOW" "$TMP"/sync.email
-		gentooupdate_exit 2 "The \"emerge --sync\" operation failed"
+		gentooupdate_email $EMAIL_ERROR $HOSTNAME": update failed on $NOW" "$TMP"/sync.email
+		if [ $VERBOSE -ge 1 ]; then
+			echo "The \"emerge $SYNC_ARGS\" operation failed." >&2
+		fi
+		gentooupdate_exit 2
 	fi
 }
 
@@ -240,8 +289,11 @@ function gentooupdate_update
 		echo "The \"emerge -uDN --with-bdeps=y world\" operation failed. Log is included below:" >>"$TMP"/update.email
 		echo >>"$TMP"/update.email
 		cat "$TMP"/update.log >>"$TMP"/update.email
-		gentooupdate_email $EMAIL_ERROR $(hostname --fqdn)": update failed on $NOW" "$TMP"/update.email
-		gentooupdate_exit 3 "The \"emerge -uDN --with-bdeps=y world\" operation failed"
+		gentooupdate_email $EMAIL_ERROR $HOSTNAME": update failed on $NOW" "$TMP"/update.email
+		if [ $VERBOSE -ge 1 ]; then
+			echo "The \"emerge $UPDATE_ARGS\" operation failed." >&2
+		fi
+		gentooupdate_exit 3
 	fi
 }
 
@@ -262,12 +314,14 @@ EMAIL_LOG=""
 AUTO_ABORT=true
 SYNC_ARGS="--sync"
 UPDATE_ARGS="-uDN --with-bdeps=y --complete-graph --backtrack=65536 --quiet --verbose-conflicts world"
-REPRESERVE_ARGS="@preserved-rebuild"
+PRESERVED_REBUILD_ARGS="@preserved-rebuild"
 DEPCLEAN_ARGS="--depclean"
 REVDEP_ARGS=""
+PERL_CLEANER_ARGS="--reallyall"
 DEBUG=false
-NICE=0
+NICE=20
 TMP="/tmp"
+VERBOSE=0
 
 #------------------------------------------------------------------------------
 # config files
@@ -288,7 +342,7 @@ while [ $# -ne 0 ]; do
 			AUTO_ABORT="$2"
 			shift 2
 			;;
-		"-d")
+		"-d"|"--depclean-args")
 			DEPCLEAN_ARGS="$2"
 			shift 2
 			;;
@@ -296,24 +350,36 @@ while [ $# -ne 0 ]; do
 			REVDEP_ARGS="$2"
 			shift 2
 			;;
-		"-h")
+		"-h"|"--help")
 			gentooupdate_help
-			exit 1
+			exit
 			;;
-		"-n")
+		"-l"|"--perl-cleaner-args")
+			PERL_CLEANER_ARGS="$2"
+			shift 2
+			;;
+		"-n"|"--nice")
 			NICE="$2"
 			shift 2
 			;;
-		"-r")
-			REPRESERVE_ARGS="$2"
+		"-r"|"--preserved-rebuild-args")
+			PRESERVED_REBUILD_ARGS="$2"
 			shift 2
 			;;
-		"-s")
+		"-s"|"--sync-args")
 			SYNC_ARGS="$2"
 			shift 2
 			;;
-		"-u")
+		"-u"|"--update-args")
 			UPDATE_ARGS="$2"
+			shift 2
+			;;
+		"-v")
+			VERBOSE=1
+			shift
+			;;
+		"--verbose")
+			VERBOSE="$2"
 			shift 2
 			;;
 		*)
@@ -326,6 +392,7 @@ done
 #------------------------------------------------------------------------------
 # prepare environment
 
+HOSTNAME=$(hostname --fqdn 2>/dev/null || hostname 2>/dev/null)
 gentooupdate_check_dependencies emerge revdep-rebuild
 EXITING=false
 trap gentooupdate_exit EXIT SIGHUP SIGINT SIGQUIT SIGABRT SIGKILL SIGTERM
